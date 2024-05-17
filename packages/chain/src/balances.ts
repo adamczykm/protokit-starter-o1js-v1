@@ -12,11 +12,11 @@ export class Balances extends BaseBalances<BalancesConfig> {
   @state() public circulatingSupply = State.from<Balance>(Balance);
 
   @runtimeMethod()
-  public addBalance(
+  public async addBalance(
     tokenId: TokenId,
     address: PublicKey,
     amount: Balance
-  ): void {
+  ): Promise<void> {
     const circulatingSupply = this.circulatingSupply.get();
     const newCirculatingSupply = Balance.from(circulatingSupply.value).add(
       amount

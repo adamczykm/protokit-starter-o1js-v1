@@ -1,6 +1,8 @@
 {
   "private": true,
   "scripts": {
+    "setup_deps": "npm run setup_protokit",
+    "setup_protokit": "sh ./scripts/install_dep.sh https://github.com/adamczykm/protokit-framework o1js-1 protokit",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

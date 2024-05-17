@@ -23,16 +23,16 @@
     "dev": "npm-watch build-and-start"
   },
   "peerDependencies": {
-    "@proto-kit/api": "*",
-    "@proto-kit/cli": "*",
-    "@proto-kit/common": "*",
-    "@proto-kit/library": "*",
-    "@proto-kit/module": "*",
-    "@proto-kit/protocol": "*",
-    "@proto-kit/sdk": "*",
-    "@proto-kit/sequencer": "*",
-    "o1js": "0.13.1",
-    "tsyringe": "^4.7.0"
+    "@proto-kit/api": "file:./deps/protokit/packages/api",
+    "@proto-kit/cli": "file:./deps/protokit/packages/cli",
+    "@proto-kit/common": "file:./deps/protokit/packages/common",
+    "@proto-kit/library": "file:./deps/protokit/packages/library",
+    "@proto-kit/module": "file:./deps/protokit/packages/module",
+    "@proto-kit/protocol": "file:./deps/protokit/packages/protocol",
+    "@proto-kit/sdk": "file:./deps/protokit/packages/sdk",
+    "@proto-kit/sequencer": "file:./deps/protokit/packages/sequencer",
+    "o1js": "link:./deps/protokit/node_modules/o1js",
+    "tsyringe": "link:./deps/protokit/node_modules/tsyringe"
   },
   "devDependencies": {
     "@jest/globals": "^29.6.1",
