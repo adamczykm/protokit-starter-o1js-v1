@@ -3,16 +3,22 @@ import { StateMap, assert, } from "@proto-kit/protocol";
 import { Balances as BaseBalances } from "@proto-kit/library";
 import { CreateOrder, DeletedOrder, DeletedOrderId, Order, OrderId } from "./order";
 import { Poseidon, UInt64 } from "o1js";
+import { OrderLock } from "./order-lock";
 
 interface OrderBookConfig {
   minTokenAmount: UInt64,
-  maxValidityPeriod: UInt64
+  maxValidityPeriod: UInt64,
+  lockPeriod: UInt64, // amount of l2 blocks from now
 }
 
 @runtimeModule()
 export class Balances extends BaseBalances<OrderBookConfig> {
 
   @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
+  @state() public order_locks = StateMap.from<OrderId, OrderLock>(OrderId, OrderLock);
+
+
+  /// OFF-RAMPING
 
   // create order
   @runtimeMethod()
@@ -63,22 +69,33 @@ export class Balances extends BaseBalances<OrderBookConfig> {
   }
 
 
+  /// ON-RAMPING
 
-  // @runtimeMethod()
-  // public async addBalance(
-  //   tokenId: TokenId,
-  //   address: PublicKey,
-  //   amount: Balance
-  // ): Promise<void> {
-  //   const circulatingSupply = this.circulatingSupply.get();
-  //   const newCirculatingSupply = Balance.from(circulatingSupply.value).add(
-  //     amount
-  //   );
-  //   assert(
-  //     newCirculatingSupply.lessThanOrEqual(this.config.totalSupply),
-  //     "Circulating supply would be higher than total supply"
-  //   );
-  //   this.circulatingSupply.set(newCirculatingSupply);
-  //   this.mint(tokenId, address, amount);
-  // }
+  // list is provided via sequencer graphql somehow
+
+
+  // lock the order
+  @runtimeMethod()
+  public async lockOrder(
+    order_id: OrderId
+  ): Promise<void> {
+    const order: Order = this.orders.get(order_id).value;
+
+    // it must be unlocked
+    assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
+
+    // it must be valid
+    assert(order.valid_until.lessThanOrEqual(this.network.block.height), "Order is not valid");
+
+    // lock it
+    this.orders.set(order_id, new Order({
+      ...order,
+      locked_until: this.network.block.height.add(this.config.lockPeriod)
+    }));
+  }
+
+
+
+
+
 }
