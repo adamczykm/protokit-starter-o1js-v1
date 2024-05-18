@@ -1,5 +1,5 @@
 import { runtimeModule, state, runtimeMethod } from "@proto-kit/module";
-import { StateMap, assert, } from "@proto-kit/protocol";
+import { State, StateMap, assert, } from "@proto-kit/protocol";
 import { CreateOrder, DeletedOrder, Order, OrderId } from "./order";
 import { Bool, Field, PublicKey, UInt64 } from "o1js";
 import { OrderLock } from "./order-lock";
@@ -16,34 +16,36 @@ interface OrderBookConfig {
 @runtimeModule()
 export class OrderBook extends BaseBalances<OrderBookConfig> {
     @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
+    @state() public orderIndexLength = State.from<UInt64>(UInt64);
+    @state() public orderIndex = StateMap.from<UInt64, OrderId>(UInt64, OrderId);
 
-    // no direct transfers
-    @runtimeMethod()
-    public override async transferSigned(
-      _tokenId: TokenId,
-      _from: PublicKey,
-      _to: PublicKey,
-      _amount: Balance
-    ) {
-      assert(Bool(false),"Not available in this module");
-    }
-
-
-    public async addBalance(
-      tokenId: TokenId,
-      amount: Balance
-    ): Promise < void> {
-      const address = this.transaction.sender.value;
-      this.mint(tokenId, address, amount);
+  // no direct transfers
+  @runtimeMethod()
+  public override async transferSigned(
+    _tokenId: TokenId,
+    _from: PublicKey,
+    _to: PublicKey,
+    _amount: Balance
+  ) {
+    assert(Bool(false), "Not available in this module");
   }
 
-    public async removeBalance(
-      tokenId: TokenId,
-      amount: Balance
-    ): Promise < void> {
-      const address = this.transaction.sender.value;
-      this.burn(tokenId, address, amount);
-    }
+
+  public async addBalance(
+    tokenId: TokenId,
+    amount: Balance
+  ): Promise<void> {
+    const address = this.transaction.sender.value;
+    this.mint(tokenId, address, amount);
+  }
+
+  public async removeBalance(
+    tokenId: TokenId,
+    amount: Balance
+  ): Promise<void> {
+    const address = this.transaction.sender.value;
+    this.burn(tokenId, address, amount);
+  }
 
 
   /// OFF-RAMPING
@@ -60,6 +62,12 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
     const order = Order.create(order_details, creator_pubkey);
     // TODO: if order exists, fail
     this.orders.set(order_details.order_id, order);
+
+    // add to the index
+    this.orderIndex.set(this.orderIndexLength.get().value, order_details.order_id);
+
+    const newIndex = this.orderIndexLength.get().value.add(UInt64.from(1));
+    this.orderIndexLength.set(newIndex);
 
     // TODO: mocked - you create the money by creating the order
     this.addBalance(
