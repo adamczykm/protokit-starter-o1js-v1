@@ -74,6 +74,9 @@ describe("order-book", () => {
 
     const order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
+    const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
+    expect(count?.toBigInt()).toEqual(1n)
+
     const bk = new BalancesKey({ tokenId, address: alice })
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
 
@@ -124,6 +127,9 @@ describe("order-book", () => {
 
     // should not be deleted
     expect(order?.deleted.toBoolean()).toBe(false);
+
+    const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
+    expect(count?.toBigInt()).toEqual(2n)
 
   }, 1_000_000);
 
@@ -290,5 +296,22 @@ describe("order-book", () => {
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
     expect(balance?.toBigInt()).toBe(0n);
 
+    const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
+    expect(count?.toBigInt()).toEqual(2n)
+
   }, 1_000_000);
+
+
+  it("Order indices work as expected", async () => {
+
+    const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
+    expect(count?.toBigInt()).toEqual(2n)
+
+    const index0 = await appChain.query.runtime.OrderBook.orderIndex.get(UInt64.from(0));
+    expect(index0?.toBigInt()).toEqual(1n)
+
+    const index1 = await appChain.query.runtime.OrderBook.orderIndex.get(UInt64.from(1));
+    expect(index1?.toBigInt()).toEqual(2n)
+
+  })
 });
