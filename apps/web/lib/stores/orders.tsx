@@ -23,6 +23,11 @@ export interface OrdersState {
         orderId: OrderId,
         senderIdHash: Field
     ) => Promise<void>;
+    closeOrder: (
+        client: Client,
+        user: PublicKey,
+        orderId: OrderId
+    ) => Promise<void>;
     // verifyEmail: (
     //     client: Client,
     //     orderId: OrderId,
@@ -85,7 +90,6 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
                 state.orders[orderId] = orderId;
             });
 
-            // return tx.transaction;
         },
         async commitOrder(client: Client, buyer: PublicKey, orderId: OrderId, senderIdHash: Field) {
             set((state) => {
@@ -97,6 +101,24 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
             const tx = await client.transaction(buyer, async () => {
                 orders.lockOrder(orderId, senderIdHash);
 
+            });
+
+            await tx.sign();
+            await tx.send();
+
+            set((state) => {
+                state.loading = false;
+            });
+        },
+        async closeOrder(client: Client, user: PublicKey, orderId: OrderId) {
+            set((state) => {
+                state.loading = true;
+            });
+
+            const orders = client.runtime.resolve("OrderBook");
+
+            const tx = await client.transaction(user, async () => {
+                orders.closeOrder(orderId);
             });
 
             await tx.sign();
