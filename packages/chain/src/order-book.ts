@@ -87,6 +87,9 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
     // only the creator can manually close the order
     assert(order.creator_pubkey.equals(creator_pubkey), "Only the creator can close the order");
 
+    // must not be deleted
+    assert(order.deleted.equals(Bool(false)), "Order does not exist");
+
     // it must be unlocked
     assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
 
@@ -118,11 +121,14 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
 
     const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
 
+    // must not be deleted
+    assert(order.deleted.equals(Bool(false)), "Order does not exist");
+
     // it must be valid
-    assert(order.valid_until.lessThanOrEqual(this.network.block.height), "Order is not valid");
+    assert(order.valid_until.greaterThan(this.network.block.height), "Order is not valid");
 
     // it must be unlocked
-    assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
+    assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is already locked");
 
     // create and set the lock
     const new_lock = OrderLock.create({usd_sender_id_hash, sender_public_key: this.transaction.sender.value});

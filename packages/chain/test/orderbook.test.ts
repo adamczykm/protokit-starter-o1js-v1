@@ -59,7 +59,7 @@ describe("order-book", () => {
     const tx1 = await appChain.transaction(alice, async () => {
       orderbook().createOrder({
         order_id: oid,
-        valid_until: UInt64.from(3),
+        valid_until: UInt64.from(19),
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
         amount_usd: UInt64.from(100),
@@ -82,7 +82,7 @@ describe("order-book", () => {
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
 
-    expect(order?.valid_until.toBigInt()).toBe(3n);
+    expect(order?.valid_until.toBigInt()).toBe(19n);
 
     expect(balance?.toBigInt()).toBe(100n);
 
@@ -101,7 +101,7 @@ describe("order-book", () => {
     const tx1 = await appChain.transaction(alice, async () => {
       orderbook().createOrder({
         order_id: oid,
-        valid_until: UInt64.from(4),
+        valid_until: UInt64.from(20),
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
         amount_usd: UInt64.from(100),
@@ -121,7 +121,7 @@ describe("order-book", () => {
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
 
-    expect(order?.valid_until.toBigInt()).toBe(4n);
+    expect(order?.valid_until.toBigInt()).toBe(20n);
 
     expect(balance?.toBigInt()).toBe(200n);
 
@@ -314,4 +314,76 @@ describe("order-book", () => {
     expect(index1?.toBigInt()).toEqual(2n)
 
   })
+  it("should not be able to lock an invalid order", async () => {
+
+  })
+
+  it("should not be able to run an order without a valid (mock) proof", async () => {
+
+    appChain.setSigner(alicePrivateKey);
+
+    const oid = new OrderId(10);
+
+    const tx1 = await appChain.transaction(alice, async () => {
+      orderbook().createOrder({
+        order_id: oid,
+        valid_until: UInt64.from(10),
+        token_id: TokenId.from(0), // mina
+        amount_token: Balance.from(100),
+        amount_usd: UInt64.from(100),
+        usd_receiver_id_hash: Field(0)
+      });
+    });
+
+    await tx1.sign();
+    await tx1.send();
+
+    const block = await appChain.produceBlock();
+
+    expect(block?.height.equals(8));
+
+    const order = await appChain.query.runtime.OrderBook.orders.get(oid);
+
+    const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
+    expect(count?.toBigInt()).toEqual(3n)
+
+    const bk = new BalancesKey({ tokenId, address: alice })
+    const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
+
+    expect(block?.transactions[0].status.toBoolean()).toBe(true);
+
+    expect(order?.valid_until.toBigInt()).toBe(10n);
+
+    expect(balance?.toBigInt()).toBe(100n);
+
+    // should not be deleted
+    expect(order?.deleted.toBoolean()).toBe(false);
+
+    appChain.setSigner(bobPrivateKey);
+
+    const tx2 = await appChain.transaction(bob, async () => {
+      orderbook().lockOrder(oid, Field(2))
+    });
+
+    await tx2.sign();
+    await tx2.send();
+
+    const block2 = await appChain.produceBlock();
+    expect(block2?.height.equals(9));
+
+    const order2 = await appChain.query.runtime.OrderBook.orders.get(oid);
+
+    // valid transaction
+    expect(block2?.transactions[0].status.toBoolean()).toBe(true);
+
+    // should not be deleted
+    expect(order2?.deleted.toBoolean()).toBe(false);
+
+    // should be locked until
+    expect(order2?.locked_until.toBigInt()).toBe(12n); // 9 + 3
+
+    // lock should not be zero
+    expect(order2?.lock.lock.toBigInt()).toBeGreaterThan(0n);
+
+  }, 1_000_000);
 });
