@@ -26,19 +26,21 @@ export function CommitOrderInternal({
     //     commitOrder: state.commitOrder,
     //     verifyEmail: state.verifyEmail
     // }));
-    const { orders, getOrder, commitOrder } = useOrdersStore((state) => ({
+    const { orders, getOrder, commitOrder, closeOrder } = useOrdersStore((state) => ({
         orders: state.orders,
         getOrder: state.getOrder,
         commitOrder: state.commitOrder,
+        closeOrder: state.closeOrder,
         // verifyEmail: state.verifyEmail
     }));
     const [orderList, setOrderList] = useState<Map<string, Order>>(new Map());
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [paypalId, setPaypalId] = useState<string>("");
 
-    const currency_code = "USD";
+    // const currency_code = "USD";
 
     useEffect(() => {
         const fetchOrders = async () => {
+            console.log("[fetchOrders] orders = ", orders)
             if (client) {
                 const orderPromises = Object.values(orders).map((orderId) =>
                     getOrder(client, OrderId.from(orderId))
@@ -50,6 +52,7 @@ export function CommitOrderInternal({
                         newOrderList.set(Object.keys(orders)[index], order);
                     }
                 });
+                console.log("[fetchOrders] newOrderList = ", newOrderList)
                 setOrderList(newOrderList);
             }
         };
@@ -57,10 +60,10 @@ export function CommitOrderInternal({
         fetchOrders();
     }, [client, orders, getOrder]);
 
-    const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
-    if (!paypalClientId) {
-        throw new Error("PayPal Client ID is not defined. Please set NEXT_PUBLIC_PAYPAL_CLIENT_ID in your environment variables.");
-    }
+    // const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
+    // if (!paypalClientId) {
+    //     throw new Error("PayPal Client ID is not defined. Please set NEXT_PUBLIC_PAYPAL_CLIENT_ID in your environment variables.");
+    // }
 
     const handleCommit = async (orderId: OrderId, senderPaypalId: string) => {
         setLoading(true);
@@ -81,6 +84,17 @@ export function CommitOrderInternal({
             if (file && client) {
                 const emailContent = await file.text();
                 // await verifyEmail(client, order.id, emailContent);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemove = async (orderId: OrderId) => {
+        setLoading(true);
+        try {
+            if (client && wallet) {
+                await closeOrder(client, PublicKey.fromBase58(wallet), orderId);
             }
         } finally {
             setLoading(false);
@@ -115,6 +129,15 @@ export function CommitOrderInternal({
                     <p>Amount: {order.amount_token.toString()} MINA</p>
                     <p>Price: {order.amount_usd.toString()} $</p>
                     <p>Valid Until: {order.valid_until.toString()}</p>
+                    <p>Locked: {order.locked_until?.toString() || "N/A"}</p>
+                    <p>Deleted: {order.deleted ? "Yes" : "No"}</p>
+                    <input
+                        type="text"
+                        placeholder="Enter PayPal ID"
+                        value={paypalId}
+                        onChange={(e) => setPaypalId(e.target.value)}
+                        className="mb-2 p-2 border rounded w-full"
+                    />
                     <Button
                         size="sm"
                         onClick={() => handleCommit(new OrderId(UInt64.from(orderId)), "exampleSenderId")}
@@ -126,7 +149,14 @@ export function CommitOrderInternal({
                         type="file"
                         accept=".eml"
                         onChange={(e) => handleUpload(e, order)}
+                        className="mt-2"
                     />
+                    <Button
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => handleRemove(new OrderId(UInt64.from(orderId)))}
+                    >
+                        Close
+                    </Button>
                 </div>
             ))}
 

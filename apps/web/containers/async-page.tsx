@@ -36,7 +36,7 @@ export default function Home() {
         <div className="mx-auto -mt-32 h-full pt-16">
             <div className="flex h-full w-full items-center justify-center pt-16">
                 <div className="flex flex-col items-center justify-center w-full max-w-3xl">
-                    <div className="flex space-x-4 mb-8">
+                    <div className="fix space-x-4 mb-8">
                         <button
                             onClick={() => setSelectedTab('order')}
                             className={`px-4 py-2 ${selectedTab === 'order' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
@@ -50,7 +50,7 @@ export default function Home() {
                             Commit Order
                         </button>
                     </div>
-                    <div className="w-full">
+                    <div className="w-full flex-grow">
                         {renderContent()}
                     </div>
                 </div>
