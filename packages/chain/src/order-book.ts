@@ -1,10 +1,11 @@
-import { runtimeModule, state, runtimeMethod, RuntimeModule } from "@proto-kit/module";
+import { runtimeModule, state, runtimeMethod } from "@proto-kit/module";
 import { StateMap, assert, } from "@proto-kit/protocol";
 import { CreateOrder, DeletedOrder, Order, OrderId } from "./order";
-import { Bool, Field, Poseidon, UInt64 } from "o1js";
+import { Bool, Field, PublicKey, UInt64 } from "o1js";
 import { OrderLock } from "./order-lock";
 import { PaypalTxProof } from "./paypal";
 import { UsdTxProofData } from "./usd-tx";
+import { Balance, Balances as BaseBalances, TokenId } from "@proto-kit/library";
 
 interface OrderBookConfig {
   minTokenAmount: UInt64,
@@ -13,9 +14,36 @@ interface OrderBookConfig {
 }
 
 @runtimeModule()
-export class OrderBook extends RuntimeModule<OrderBookConfig> {
+export class OrderBook extends BaseBalances<OrderBookConfig> {
+    @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
 
-  @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
+    // no direct transfers
+    @runtimeMethod()
+    public override async transferSigned(
+      _tokenId: TokenId,
+      _from: PublicKey,
+      _to: PublicKey,
+      _amount: Balance
+    ) {
+      throw new Error("Not available in this module");
+    }
+
+
+    public async addBalance(
+      tokenId: TokenId,
+      amount: Balance
+    ): Promise < void> {
+      const address = this.transaction.sender.value;
+      this.mint(tokenId, address, amount);
+  }
+
+    public async removeBalance(
+      tokenId: TokenId,
+      amount: Balance
+    ): Promise < void> {
+      const address = this.transaction.sender.value;
+      this.burn(tokenId, address, amount);
+    }
 
 
   /// OFF-RAMPING
@@ -25,15 +53,19 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
   public async createOrder(
     order_details: CreateOrder
   ): Promise<void> {
-    const creator_pkh = Poseidon.hash(this.transaction.sender.value.toFields())
+    const creator_pubkey = this.transaction.sender.value;
 
     // TODO: do checks!
 
-    const order = Order.create(order_details, creator_pkh);
+    const order = Order.create(order_details, creator_pubkey);
     // TODO: if order exists, fail
     this.orders.set(order_details.order_id, order);
 
-    // TODO: transfer tokens to the balances
+    // TODO: mocked - you create the money by creating the order
+    this.addBalance(
+      order_details.token_id,
+      order_details.amount_token,
+    );
   }
 
   // close order
@@ -41,16 +73,22 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
   public async closeOrder(
     order_id: OrderId
   ): Promise<void> {
-    const creator_pkh = Poseidon.hash(this.transaction.sender.value.toFields())
+    const creator_pubkey = this.transaction.sender.value;
     const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
 
     // only the creator can manually close the order
-    assert(order.creator_pkh.equals(creator_pkh), "Only the creator can close the order");
+    assert(order.creator_pubkey.equals(creator_pubkey), "Only the creator can close the order");
 
     // it must be unlocked
     assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
 
     // TODO: transfer tokens back to the creator
+    // MOCKED: it just burns the tokens
+    this.removeBalance(
+      order.token_id,
+      order.amount_token
+    );
+
     this.orders.set(order_id, DeletedOrder);
   }
 
@@ -118,7 +156,13 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
 
     assert(proof_data_hash_from_order.equals(proof_data_hash_from_proof), "Proof data does not match the order");
 
-    // TODO! transfer the tokens
+    const sender = this.transaction.sender.value;
+    this.transfer(
+      order.token_id,
+      order.creator_pubkey,
+      sender,
+      order.amount_token
+    );
 
     // delete the order
     this.orders.set(order_id, DeletedOrder);
