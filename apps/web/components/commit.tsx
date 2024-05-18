@@ -2,10 +2,11 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useClientStore } from "@/lib/stores/client";
-import { useOrdersStore, Order } from "@/lib/stores/orders";
+import { useOrdersStore } from "@/lib/stores/orders";
 import { useEffect, useState } from "react";
-import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from "@paypal/react-paypal-js";
-import { PublicKey } from "o1js";
+// import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from "@paypal/react-paypal-js";
+import { PublicKey, CircuitString, Field, UInt64 } from "o1js";
+import { OrderId, Order } from "chain/dist/order"
 
 export interface CommitOrderProps {
     wallet?: string;
@@ -20,37 +21,53 @@ export function CommitOrderInternal({
     setLoading,
 }: CommitOrderProps) {
     const client = useClientStore((state) => state.client);
-    const { fetchOrders, commitOrder, verifyEmail } = useOrdersStore((state) => ({
-        fetchOrders: state.fetchOrders,
+    // const { fetchOrders, commitOrder, verifyEmail } = useOrdersStore((state) => ({
+    //     fetchOrders: state.fetchOrders,
+    //     commitOrder: state.commitOrder,
+    //     verifyEmail: state.verifyEmail
+    // }));
+    const { orders, getOrder, commitOrder } = useOrdersStore((state) => ({
+        orders: state.orders,
+        getOrder: state.getOrder,
         commitOrder: state.commitOrder,
-        verifyEmail: state.verifyEmail
+        // verifyEmail: state.verifyEmail
     }));
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [orderList, setOrderList] = useState<Map<string, Order>>(new Map());
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
     const currency_code = "USD";
 
-    // useEffect(() => {
-    //     const loadOrders = async () => {
-    //         if (client) {
-    //             const ordersList = await fetchOrders(client);
-    //             setOrders(ordersList);
-    //         }
-    //     };
+    useEffect(() => {
+        const fetchOrders = async () => {
+            if (client) {
+                const orderPromises = Object.values(orders).map((orderId) =>
+                    getOrder(client, OrderId.from(orderId))
+                );
+                const resolvedOrders = await Promise.all(orderPromises);
+                const newOrderList = new Map<string, Order>();
+                resolvedOrders.forEach((order, index) => {
+                    if (order) {
+                        newOrderList.set(Object.keys(orders)[index], order);
+                    }
+                });
+                setOrderList(newOrderList);
+            }
+        };
 
-    //     loadOrders();
-    // }, [client]);
+        fetchOrders();
+    }, [client, orders, getOrder]);
 
     const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
     if (!paypalClientId) {
         throw new Error("PayPal Client ID is not defined. Please set NEXT_PUBLIC_PAYPAL_CLIENT_ID in your environment variables.");
     }
 
-    const handleCommit = async (order: Order) => {
+    const handleCommit = async (orderId: OrderId, senderPaypalId: string) => {
         setLoading(true);
         try {
             if (client && wallet) {
-                await commitOrder(client, order.id, PublicKey.fromBase58(wallet));
+                const sender = Field.from(CircuitString.fromString(senderPaypalId).hash());
+                await commitOrder(client, PublicKey.fromBase58(wallet), orderId, sender);
             }
         } finally {
             setLoading(false);
@@ -63,25 +80,25 @@ export function CommitOrderInternal({
         try {
             if (file && client) {
                 const emailContent = await file.text();
-                await verifyEmail(client, order.id, emailContent);
+                // await verifyEmail(client, order.id, emailContent);
             }
         } finally {
             setLoading(false);
         }
     };
 
-    const [{ isPending, isResolved, isRejected }, dispatch] = usePayPalScriptReducer();
+    // const [{ isPending, isResolved, isRejected }, dispatch] = usePayPalScriptReducer();
 
-    useEffect(() => {
-        dispatch({
-            type: "resetOptions",
-            value: {
-                clientId: paypalClientId,
-                currency: currency_code,
-                intent: "capture",
-            },
-        });
-    }, [paypalClientId, currency_code, dispatch]);
+    // useEffect(() => {
+    //     dispatch({
+    //         type: "resetOptions",
+    //         value: {
+    //             clientId: paypalClientId,
+    //             currency: currency_code,
+    //             intent: "capture",
+    //         },
+    //     });
+    // }, [paypalClientId, currency_code, dispatch]);
 
     return (
         <Card className="w-full p-4">
@@ -92,14 +109,15 @@ export function CommitOrderInternal({
                 </p>
             </div>
 
-            {orders.map((order) => (
-                <div key={order.id} className="mb-4">
-                    <h3>Order #{order.id}</h3>
-                    <p>Amount: {order.amount.toString()} MINA</p>
-                    <p>Status: {order.status}</p>
+            {Array.from(orderList.entries()).map(([orderId, order]) => (
+                <div key={orderId} className="mb-4">
+                    <h3>Order #{orderId}</h3>
+                    <p>Amount: {order.amount_token.toString()} MINA</p>
+                    <p>Price: {order.amount_usd.toString()} $</p>
+                    <p>Valid Until: {order.valid_until.toString()}</p>
                     <Button
                         size="sm"
-                        onClick={() => handleCommit(order)}
+                        onClick={() => handleCommit(new OrderId(UInt64.from(orderId)), "exampleSenderId")}
                         loading={loading}
                     >
                         Commit to Order
@@ -112,7 +130,7 @@ export function CommitOrderInternal({
                 </div>
             ))}
 
-            {wallet && (
+            {/* {wallet && (
                 <div className="mt-4">
                     {isPending && <div>Loading PayPal script...</div>}
                     {isResolved && (
@@ -141,12 +159,11 @@ export function CommitOrderInternal({
                                 console.log('PayPal payment approved:', details);
                                 console.log('Payer email address:', details.payer!.email_address);
                                 console.log('Transaction amount:', details.purchase_units);
-                                // Perform any additional actions with the payment details here
 
                                 // Simulate committing the order after payment is approved
                                 if (client && wallet && selectedOrder) {
                                     const toAddress = new PublicKey(wallet);
-                                    await commitOrder(client, selectedOrder.id, PublicKey.fromBase58(wallet));
+                                    await handleCommit(client, selectedOrder.id, PublicKey.fromBase58(wallet));
                                     alert(`Transaction completed by ${details.payer!.name}`);
                                 }
                             }}
@@ -158,19 +175,19 @@ export function CommitOrderInternal({
                     )}
                     {isRejected && <div>Failed to load PayPal script</div>}
                 </div>
-            )}
+            )} */}
 
         </Card>
     )
 }
 
-export function CommitOrder(props: CommitOrderProps) {
-    const paypalClientId = process.env.PAYPAL_CLIENT_ID || "";
-    const currency_code = "USD";
+// export function CommitOrder(props: CommitOrderProps) {
+//     const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!;
+//     const currency_code = "USD";
 
-    return (
-        <PayPalScriptProvider options={{ clientId: paypalClientId, currency: currency_code, intent: 'capture' }}>
-            <CommitOrderInternal {...props} />
-        </PayPalScriptProvider>
-    );
-}
+//     return (
+//         <PayPalScriptProvider options={{ clientId: paypalClientId, currency: currency_code, intent: 'capture' }}>
+//             {/* <CommitOrderInternal {...props} /> */}
+//         </PayPalScriptProvider>
+//     );
+// }

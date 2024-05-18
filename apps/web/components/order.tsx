@@ -6,7 +6,9 @@ import { useForm, SubmitHandler, FormProvider } from "react-hook-form";
 import { Button } from "./ui/button";
 import { useClientStore } from "@/lib/stores/client";
 import { useOrdersStore } from "@/lib/stores/orders";
-import { PublicKey, UInt64 } from "o1js";
+import { PublicKey, UInt64, CircuitString, Field } from "o1js";
+import { CreateOrder, OrderId } from "chain/dist/order"
+import { TokenId, Balance } from "@proto-kit/library";
 
 export interface OrderProps {
     wallet?: string;
@@ -24,21 +26,12 @@ interface OrderFormInputs {
 
 export function Order({
     wallet,
-    onConnectWallet,
     loading,
     setLoading,
 }: OrderProps) {
     const methods = useForm<OrderFormInputs>();
     const client = useClientStore((state) => state.client);
     const publishOrder = useOrdersStore((state) => state.publishOrder);
-
-    const convertToUInt64 = (value: string): UInt64 => {
-        const numericValue = parseFloat(value);
-        if (isNaN(numericValue)) {
-            throw new Error(`Invalid number: ${value}`);
-        }
-        return UInt64.from(Math.round(numericValue * 1e9));
-    };
 
     const onSubmit: SubmitHandler<OrderFormInputs> = async (data) => {
         const { paypalAccountId, amount, price } = data;
@@ -47,12 +40,24 @@ export function Order({
         setLoading(true);
         try {
             if (client && wallet) {
+                const randomBigInt = BigInt.asUintN(64, BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)));
+                const validUntil = UInt64.from(1000);
+                const tokenId = TokenId.from(0);
+                const amountToken = UInt64.from(parseFloat(amount));
+                const amountUsd = UInt64.from(parseFloat(price) * 100);
+                const usdReceiverIdHash = CircuitString.fromString(paypalAccountId).hash();
+                const order = new CreateOrder({
+                    order_id: new OrderId(UInt64.from(randomBigInt)),
+                    valid_until: validUntil,
+                    token_id: tokenId,
+                    amount_token: new Balance(amountToken),
+                    amount_usd: amountUsd,
+                    usd_receiver_id_hash: Field.from(usdReceiverIdHash),
+                });
                 await publishOrder(
                     client,
-                    paypalAccountId,
                     PublicKey.fromBase58(wallet),
-                    convertToUInt64(amount),
-                    price,
+                    order,
                 );
             }
         } finally {

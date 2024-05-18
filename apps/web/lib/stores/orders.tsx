@@ -1,41 +1,39 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { Client } from "./client";
-import { PublicKey, UInt64 } from "o1js";
+import { PublicKey, Field } from "o1js";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
-
-export interface Order {
-    id: string;
-    amount: UInt64;
-    status: string;
-}
+import { CreateOrder, OrderId, Order } from "chain/dist/order";
 
 export interface OrdersState {
     loading: boolean;
-    orders: Order[];
-    fetchOrders: (client: Client) => Promise<Order[]>;
+    orders: {
+        [key: string]: string;
+    };
+    getOrder: (client: Client, orderId: OrderId) => Promise<Order | undefined>;
+    // fetchOrders: (client: Client) => Promise<Order[]>;
     publishOrder: (
         client: Client,
-        paypalId: string,
         sender: PublicKey,
-        amount: UInt64,
-        price: string
-    ) => Promise<PendingTransaction>;
+        order: CreateOrder
+    ) => Promise<void>;
     commitOrder: (
         client: Client,
-        orderId: string,
-        buyer: PublicKey
+        buyer: PublicKey,
+        orderId: OrderId,
+        senderIdHash: Field
     ) => Promise<void>;
-    verifyEmail: (
-        client: Client,
-        orderId: string,
-        emailContent: string
-    ) => Promise<void>;
+    // verifyEmail: (
+    //     client: Client,
+    //     orderId: OrderId,
+    //     emailContent: string
+    // ) => Promise<void>;
 }
 
 function isPendingTransaction(
     transaction: PendingTransaction | UnsignedTransaction | undefined
 ): asserts transaction is PendingTransaction {
+    console.log("")
     if (!(transaction instanceof PendingTransaction))
         throw new Error("Transaction is not a PendingTransaction");
 }
@@ -43,71 +41,62 @@ function isPendingTransaction(
 export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
     immer((set) => ({
         loading: Boolean(false),
-        orders: [],
-        async fetchOrders(client: Client): Promise<Order[]> {
-            set((state) => {
-                state.loading = true;
-            });
-
-            const orders = client.query.runtime.Orders.orders.getAll();
-
-            set((state) => {
-                state.orders = orders;
-                state.loading = false;
-            });
-
-            return orders;
+        orders: {},
+        async getOrder(client: Client, orderId: OrderId) {
+            const order = await client.query.runtime.OrderBook.orders.get(orderId);
+            return order;
         },
-        async publishOrder(client: Client, paypalId: string, sender: PublicKey, amount: UInt64, price: string) {
+        // async fetchOrders(client: Client): Promise<Order[]> {
+        //     set((state) => {
+        //         state.loading = true;
+        //     });
+
+        //     const orders = client.query.runtime.OrderBook.orders.get(new OrderId("test"));
+
+        //     set((state) => {
+        //         state.orders[orderId] = order;
+        //         state.loading = false;
+        //     });
+
+        //     return orders;
+        // },
+        async publishOrder(client: Client, sender: PublicKey, order: CreateOrder) {
             set((state) => {
                 state.loading = true;
             });
 
-            const orders = client.runtime.resolve("Orders");
+            const orders = client.runtime.resolve("OrderBook");
 
-            const tx = await client.transaction(sender, () => {
-                orders.publishOrder(paypalId, sender, amount, price);
+            const tx = await client.transaction(sender, async () => {
+                orders.createOrder(order);
             });
 
             await tx.sign();
             await tx.send();
 
-            isPendingTransaction(tx.transaction);
+            console.log("tx = ", tx);
+            console.log("tx.transaction = ", tx.transaction);
 
+            // isPendingTransaction(tx.transaction);
+
+            const orderId = order.order_id.toString();
             set((state) => {
                 state.loading = false;
+                state.orders[orderId] = orderId;
             });
 
-            return tx.transaction;
+            // return tx.transaction;
         },
-        async commitOrder(client: Client, orderId: string, buyer: PublicKey) {
+        async commitOrder(client: Client, buyer: PublicKey, orderId: OrderId, senderIdHash: Field) {
             set((state) => {
                 state.loading = true;
             });
 
-            const orders = client.runtime.resolve("Orders");
+            const orders = client.runtime.resolve("OrderBook");
 
-            const tx = await client.transaction(buyer, () => {
-                orders.commitOrder(orderId, buyer);
+            const tx = await client.transaction(buyer, async () => {
+                orders.lockOrder(orderId, senderIdHash);
 
-            });
-
-            await tx.sign();
-            await tx.send();
-
-            set((state) => {
-                state.loading = false;
-            });
-        },
-        async verifyEmail(client: Client, orderId: string, emailContent: string) {
-            set((state) => {
-                state.loading = true;
-            });
-
-            const orders = client.runtime.resolve("Orders"); await client.query.runtime.Balances.balances.get(key);
-
-            const tx = await client.transaction(PublicKey.fromBase58(orderId), () => {
-                orders.verifyEmail(orderId, emailContent);
             });
 
             await tx.sign();
@@ -117,5 +106,23 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
                 state.loading = false;
             });
         },
+        // async verifyEmail(client: Client, orderId: OrderId, emailContent: string) {
+        //     set((state) => {
+        //         state.loading = true;
+        //     });
+
+        //     const orders = client.runtime.resolve("OrderBook"); await client.query.runtime.Balances.balances.get(key);
+
+        //     const tx = await client.transaction(PublicKey.fromBase58(orderId), async () => {
+        //         orders.verifyEmail(orderId, emailContent);
+        //     });
+
+        //     await tx.sign();
+        //     await tx.send();
+
+        //     set((state) => {
+        //         state.loading = false;
+        //     });
+        // },
     }))
 );
