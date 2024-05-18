@@ -265,4 +265,30 @@ describe("order-book", () => {
     expect(balance?.toBigInt()).toBe(100n);
 
   }, 1_000_000);
+
+  it("should be able to cancel a locked order if locked time passed", async () => {
+
+    appChain.setSigner(alicePrivateKey);
+
+    const oid = new OrderId(2);
+
+    const tx1 = await appChain.transaction(alice, async () => {
+      orderbook().closeOrder(oid)
+    });
+
+    await tx1.sign();
+    await tx1.send();
+
+    const block = await appChain.produceBlock();
+    expect(block?.height.equals(7));
+
+    let order = await appChain.query.runtime.OrderBook.orders.get(oid);
+
+    expect(order?.deleted.toBoolean()).toBe(true);
+
+    const bk = new BalancesKey({ tokenId, address: alice })
+    const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
+    expect(balance?.toBigInt()).toBe(0n);
+
+  }, 1_000_000);
 });
