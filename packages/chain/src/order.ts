@@ -51,5 +51,5 @@ export const DeletedOrder = new Order({
   amount_usd: UInt64.zero,
   usd_receiver_id_hash: Field.from(0),
   lock: OrderLock.empty(),
-  deleted: Bool(false)
+  deleted: Bool(true)
 });

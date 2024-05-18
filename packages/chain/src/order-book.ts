@@ -25,7 +25,7 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
       _to: PublicKey,
       _amount: Balance
     ) {
-      throw new Error("Not available in this module");
+      assert(Bool(false),"Not available in this module");
     }
 
 

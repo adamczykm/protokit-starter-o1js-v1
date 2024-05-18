@@ -1,8 +1,7 @@
-import { Balance } from "@proto-kit/library";
-import { Balances } from "./balances";
 import { ModulesConfig } from "@proto-kit/common";
 import { OrderBook } from "./order-book";
 import { UInt64 } from "o1js";
+import { Balances } from "@proto-kit/library";
 
 export const modules = {
   Balances,
@@ -11,7 +10,7 @@ export const modules = {
 
 export const config: ModulesConfig<typeof modules> = {
   Balances: {
-    totalSupply: Balance.from(10_000),
+    totalSupply: UInt64.from(10000),
   },
   OrderBook: {
     minTokenAmount: UInt64.from(1),
