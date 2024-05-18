@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
+    "@paypal/react-paypal-js": "^8.3.0",
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-separator": "^1.0.3",
     "@radix-ui/react-slot": "^1.0.2",
@@ -49,11 +50,11 @@
     "typescript": "^5"
   },
   "peerDependencies": {
-        "@proto-kit/module": "link:./deps/protokit/packages/module",
-        "@proto-kit/sdk": "link:./deps/protokit/packages/sdk",
-        "@proto-kit/sequencer": "link:./deps/protokit/packages/sequencer",
-        "@proto-kit/library": "link:./deps/protokit/packages/library",
-        "o1js": "link:./deps/protokit/node_modules/o1js",
-        "tsyringe": "link:./deps/protokit/node_modules/tsyringe"
+    "@proto-kit/library": "link:./deps/protokit/packages/library",
+    "@proto-kit/module": "link:./deps/protokit/packages/module",
+    "@proto-kit/sdk": "link:./deps/protokit/packages/sdk",
+    "@proto-kit/sequencer": "link:./deps/protokit/packages/sequencer",
+    "o1js": "link:./deps/protokit/node_modules/o1js",
+    "tsyringe": "link:./deps/protokit/node_modules/tsyringe"
   }
 }
