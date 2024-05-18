@@ -1,8 +1,10 @@
 import { runtimeModule, state, runtimeMethod, RuntimeModule } from "@proto-kit/module";
 import { StateMap, assert, } from "@proto-kit/protocol";
-import { CreateOrder, DeletedOrder, DeletedOrderId, Order, OrderId, PaypalId } from "./order";
-import { Poseidon, UInt64 } from "o1js";
+import { CreateOrder, DeletedOrder, Order, OrderId } from "./order";
+import { Bool, Field, Poseidon, UInt64 } from "o1js";
 import { OrderLock } from "./order-lock";
+import { PaypalTxProof } from "./paypal";
+import { UsdTxProofData } from "./usd-tx";
 
 interface OrderBookConfig {
   minTokenAmount: UInt64,
@@ -14,7 +16,6 @@ interface OrderBookConfig {
 export class OrderBook extends RuntimeModule<OrderBookConfig> {
 
   @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
-  @state() public order_locks = StateMap.from<OrderId, OrderLock>(OrderId, OrderLock);
 
 
   /// OFF-RAMPING
@@ -28,21 +29,7 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
 
     // TODO: do checks!
 
-
-    // order_id cannot be deleted order id
-    assert(order_details.order_id.equals(DeletedOrderId).not(), "Order id cannot be deleted order id");
-
-    const order = new Order({
-      order_id: order_details.order_id,
-      creator_pkh,
-      locked_until: UInt64.from(0),
-      valid_until: order_details.valid_until,
-      token_id: order_details.token_id,
-      amount_token: order_details.amount_token,
-      amount_usd: order_details.amount_usd,
-      paypal_id: order_details.paypal_id
-    });
-
+    const order = Order.create(order_details, creator_pkh);
     // TODO: if order exists, fail
     this.orders.set(order_details.order_id, order);
 
@@ -77,7 +64,7 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
   @runtimeMethod()
   public async lockOrder(
     order_id: OrderId,
-    sender_paypal_id: PaypalId
+    usd_sender_id_hash: Field
   ): Promise<void> {
 
     const current_block = this.network.block.height;
@@ -91,21 +78,49 @@ export class OrderBook extends RuntimeModule<OrderBookConfig> {
     // it must be unlocked
     assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
 
+    // create and set the lock
+    const new_lock = OrderLock.create({usd_sender_id_hash, sender_public_key: this.transaction.sender.value});
+
     // ! lock it
     this.orders.set(order_id, new Order({
       ...order,
+      lock: new_lock,
       locked_until: new_locked_until
     }));
-
-    // create and set the lock
-    const sender_pkh = Poseidon.hash(this.transaction.sender.value.toFields())
-    const lock = OrderLock.mk({sender_paypal_id, sender_pkh});
-
-    // !
-    this.order_locks.set(order_id, lock);
   }
 
+  // run the order, requires proof of the paypal transaction that matches all the details
+  @runtimeMethod()
+  public async runOrder(
+    paypal_tx_proof: PaypalTxProof
+  ): Promise<void> {
+    // --------
+    // proof initial checks
 
+    // it must be valid
+    paypal_tx_proof.mockVerify();
+    const order_id = paypal_tx_proof.publicInput.orderId;
 
+    // --------
+    // order checks
+    // must exist
+    const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
+    // must not be deleted
+    assert(order.deleted.equals(Bool(false)), "Order does not exist");
 
+    // it must be locked
+    assert(order.locked_until.greaterThanOrEqual(this.network.block.height), "Order is not locked");
+
+    // --------
+    /// do the proof data check
+    const proof_data_hash_from_order = UsdTxProofData.fromLockedOrder(order).hash();
+    const proof_data_hash_from_proof = paypal_tx_proof.publicInput.usdTxProofDataHash;
+
+    assert(proof_data_hash_from_order.equals(proof_data_hash_from_proof), "Proof data does not match the order");
+
+    // TODO! transfer the tokens
+
+    // delete the order
+    this.orders.set(order_id, DeletedOrder);
+  }
 }

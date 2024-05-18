@@ -1,19 +1,22 @@
-import { Field, Poseidon, Struct } from "o1js";
-import { PaypalId } from "./order";
+import { Field, Poseidon, PublicKey, Struct } from "o1js";
 
 export class OrderLock extends Struct({
   lock: Field,
 }) {
   // smart constructor
-  public static mk({
-    sender_paypal_id,
-    sender_pkh,
+  public static create({
+    usd_sender_id_hash,
+    sender_public_key,
   }: {
-    sender_paypal_id: PaypalId;
-    sender_pkh: Field;
+    usd_sender_id_hash: Field,
+    sender_public_key: PublicKey
   }): OrderLock {
-    const lock = Poseidon.hash([sender_pkh, sender_paypal_id.value]);
+    const lock = Poseidon.hash([usd_sender_id_hash, ...sender_public_key.toFields()]);
 
     return new OrderLock({ lock });
+  }
+
+  public static empty(): OrderLock {
+    return new OrderLock({ lock: Field.from(0) });
   }
 }

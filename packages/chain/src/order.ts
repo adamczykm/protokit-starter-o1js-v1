@@ -1,16 +1,6 @@
 import { TokenId } from "@proto-kit/library";
-import { Field, Struct, UInt64, CircuitString } from "o1js";
-
-
-export class PaypalId extends Struct({
-  value: Field
-}) {
-  public static fromString(value: string): PaypalId {
-    return new PaypalId({ value: CircuitString.fromString(value).hash() });
-  }
-
-}
-
+import { Bool, Field, Struct, UInt64 } from "o1js";
+import { OrderLock } from "./order-lock";
 
 export class OrderId extends UInt64 {}
 
@@ -20,32 +10,46 @@ export class CreateOrder extends Struct({
   token_id: TokenId,
   amount_token: UInt64,
   amount_usd: UInt64,
-  paypal_id: PaypalId,
-}) {
-}
+  usd_receiver_id_hash: Field
+}) {}
 
 export class Order extends Struct({
-  locked_until: UInt64, // 0 = unlocked  -- TODO IMPR: L2 block height for now
+  locked_until: UInt64, //  -- TODO IMPR: L2 block height for now
   creator_pkh: Field,
   // -
-  order_id: OrderId,
   valid_until: UInt64, // -- TODO IMPR: L2 block height for now
-  token_id:  TokenId,
+  token_id: TokenId,
   amount_token: UInt64,
   amount_usd: UInt64,
-  paypal_id: PaypalId
+  usd_receiver_id_hash: Field,
+  // -
+  lock: OrderLock,
+  deleted: Bool
 }) {
-}
 
-export const DeletedOrderId = new OrderId(UInt64.zero);
+  public static create( order_details: CreateOrder, creator_pkh: Field): Order {
+    return new Order({
+      creator_pkh,
+      locked_until: UInt64.zero,
+      valid_until: order_details.valid_until,
+      token_id: order_details.token_id,
+      amount_token: order_details.amount_token,
+      amount_usd: order_details.amount_usd,
+      usd_receiver_id_hash: order_details.usd_receiver_id_hash,
+      lock: OrderLock.empty(),
+      deleted: Bool(false)
+    });
+  }
+}
 
 export const DeletedOrder = new Order({
   locked_until: UInt64.zero,
   creator_pkh: Field.from(0),
-  order_id: DeletedOrderId,
   valid_until: UInt64.zero,
   token_id: TokenId.from(0),
   amount_token: UInt64.zero,
   amount_usd: UInt64.zero,
-  paypal_id: PaypalId.fromString("")
+  usd_receiver_id_hash: Field.from(0),
+  lock: OrderLock.empty(),
+  deleted: Bool(false)
 });
