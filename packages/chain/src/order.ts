@@ -1,5 +1,16 @@
 import { TokenId } from "@proto-kit/library";
-import { CircuitString, Field, Struct, UInt64 } from "o1js";
+import { Field, Struct, UInt64, CircuitString } from "o1js";
+
+
+export class PaypalId extends Struct({
+  value: Field
+}) {
+  public static fromString(value: string): PaypalId {
+    return new PaypalId({ value: CircuitString.fromString(value).hash() });
+  }
+
+}
+
 
 export class OrderId extends UInt64 {}
 
@@ -9,7 +20,7 @@ export class CreateOrder extends Struct({
   token_id: TokenId,
   amount_token: UInt64,
   amount_usd: UInt64,
-  paypal_id: CircuitString,
+  paypal_id: PaypalId,
 }) {
 }
 
@@ -22,7 +33,7 @@ export class Order extends Struct({
   token_id:  TokenId,
   amount_token: UInt64,
   amount_usd: UInt64,
-  paypal_id: CircuitString
+  paypal_id: PaypalId
 }) {
 }
 
@@ -36,5 +47,5 @@ export const DeletedOrder = new Order({
   token_id: TokenId.from(0),
   amount_token: UInt64.zero,
   amount_usd: UInt64.zero,
-  paypal_id: CircuitString.fromString("")
+  paypal_id: PaypalId.fromString("")
 });

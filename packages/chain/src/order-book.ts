@@ -1,7 +1,6 @@
-import { runtimeModule, state, runtimeMethod } from "@proto-kit/module";
+import { runtimeModule, state, runtimeMethod, RuntimeModule } from "@proto-kit/module";
 import { StateMap, assert, } from "@proto-kit/protocol";
-import { Balances as BaseBalances } from "@proto-kit/library";
-import { CreateOrder, DeletedOrder, DeletedOrderId, Order, OrderId } from "./order";
+import { CreateOrder, DeletedOrder, DeletedOrderId, Order, OrderId, PaypalId } from "./order";
 import { Poseidon, UInt64 } from "o1js";
 import { OrderLock } from "./order-lock";
 
@@ -12,7 +11,7 @@ interface OrderBookConfig {
 }
 
 @runtimeModule()
-export class Balances extends BaseBalances<OrderBookConfig> {
+export class OrderBook extends RuntimeModule<OrderBookConfig> {
 
   @state() public orders = StateMap.from<OrderId, Order>(OrderId, Order);
   @state() public order_locks = StateMap.from<OrderId, OrderLock>(OrderId, OrderLock);
@@ -56,7 +55,7 @@ export class Balances extends BaseBalances<OrderBookConfig> {
     order_id: OrderId
   ): Promise<void> {
     const creator_pkh = Poseidon.hash(this.transaction.sender.value.toFields())
-    const order: Order = this.orders.get(order_id).value;
+    const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
 
     // only the creator can manually close the order
     assert(order.creator_pkh.equals(creator_pkh), "Only the creator can close the order");
@@ -77,23 +76,34 @@ export class Balances extends BaseBalances<OrderBookConfig> {
   // lock the order
   @runtimeMethod()
   public async lockOrder(
-    order_id: OrderId
+    order_id: OrderId,
+    sender_paypal_id: PaypalId
   ): Promise<void> {
-    const order: Order = this.orders.get(order_id).value;
 
-    // it must be unlocked
-    assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
+    const current_block = this.network.block.height;
+    const new_locked_until = current_block.add(this.config.lockPeriod);
+
+    const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
 
     // it must be valid
     assert(order.valid_until.lessThanOrEqual(this.network.block.height), "Order is not valid");
 
-    // lock it
+    // it must be unlocked
+    assert(order.locked_until.lessThanOrEqual(this.network.block.height), "Order is still locked");
+
+    // ! lock it
     this.orders.set(order_id, new Order({
       ...order,
-      locked_until: this.network.block.height.add(this.config.lockPeriod)
+      locked_until: new_locked_until
     }));
-  }
 
+    // create and set the lock
+    const sender_pkh = Poseidon.hash(this.transaction.sender.value.toFields())
+    const lock = OrderLock.mk({sender_paypal_id, sender_pkh});
+
+    // !
+    this.order_locks.set(order_id, lock);
+  }
 
 
 
