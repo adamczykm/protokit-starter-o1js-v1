@@ -1,13 +1,50 @@
-# Protokit starter-kit
+# zkMinaOnramp - zkMinaFiatBridge
 
-This repository is a monorepo aimed at kickstarting application chain development using the Protokit framework.
+This repository contains a **proof-of-concept** of a fiat(USD)-MINA bridge that aims to be off-chain identity-hiding (the on-ramper) and decentralized.
 
-## Quick start
+It was created during ZK Hack Krakow (2024) hackathon for the "proto-kit track"
+https://zk-hack-krakow.devfolio.co/
 
-The monorepo contains 1 package and 1 app:
+**The project is not fully operational as of hackathon submission time** - we ran out of time before applying all the polish and functionallities it would require to be actually used.
 
-- `packages/chain` contains everything related to your app-chain
-- `apps/web` contains a demo UI that connects to your locally hosted app-chain sequencer
+**IMPORTANT for reviewers**
+The project submission is divided into two branches:
+ - `proofs2` - that contains more mocked out proofs that work with the UI
+ -  `proofs-signature` - that contains better proofs, but the UI is not compatible yet.
+
+### The goal idea overview
+The goal idea is to provide a decentralized (or decentralizable) platform to create p2p orders that would trustlessly allow to exchange between FIAT and MINA without revealing token buyer off-chain identity.
+To be expanded.
+
+### What was accomplished
+- We were able to prepare custom Protokit branch that works with the new o1js version and succesfully build a full-stack app on top of it
+- The design of the system allowing for necessary interactions.
+- The **almost finished** implementation of the system logic.
+- Next.js web app being the user entry point - it already provides a big chunk of the
+- The sequencer correctly implement the logic of the system (minus the `zkEmail` type proof verification) - it now assumes that data signed by the on-ramper is truthful.
+- The suite of tests that test out the logic of the system.
+
+
+### What was not accomplished
+
+- **The essential part of verifying the e-mail receipt** - the tools we meant to used are in alpha level functionality and we ran out of time before preparing that part. 
+- The proto-kit sequencer is now the only entity holding the off-chain state of the system which mean that is not yet trustless.
+- UI is not finished
+	- it doesn't provide enough information, smooth UX and necessary feedback.
+	- it doesn't work with the newest circuits we prepared
+- The code quality suffered heavily because of the pace of the prototyping
+
+
+### The potential road ahead
+
+### How run the project
+
+
+The monorepo contains 2 packages and 1 app:
+
+- `packages/chain` contains the implementation of the proto-kit app-chain including runtime modules (something akin to "smart contracts")
+- `packages/proofs` contains the implementation of the zk program for proving and verifier the authenticity of the payment receipt
+- `apps/web` contains a demo UI that connects to a wallet and the locally hosted app-chain sequencer
 
 **Prerequisites:**
 
@@ -15,39 +52,32 @@ The monorepo contains 1 package and 1 app:
 - pnpm
 - nvm
 
-> If you're on windows, please use Docker until we find a more suitable solution to running the `@proto-kit/cli`. 
-> Run the following command and then proceed to "Running the sequencer & UI":
->
-> `docker run -it --rm -p 3000:3000 -p 8080:8080 -v %cd%:/starter-kit -w /starter-kit gplane/pnpm:node18 bash`
-
 
 ### Setup
 
 ```zsh
-git clone https://github.com/proto-kit/starter-kit my-chain
-cd my-chain
-
 # ensures you have the right node.js version
 nvm use
+pnpm run setup_protokit # we needes to prepare custom framework version
 pnpm install
+pnpm run build # this may hang during the web app compilation you may stop it
 ```
+
+### The tests
+
+The tests for the runtime modules are defined in the `chain` package
+
+```zsh
+cd packages/chain
+pnpm run test
+```
+
+The tests may be seen as partial demo of the functionality.
 
 ### Running the sequencer & UI
 
 ```zsh
 # starts both UI and sequencer locally
 pnpm dev
-
-# starts UI only
-pnpm dev -- --filter web
-# starts sequencer only
-pnpm dev -- --filter chain
+# then visit localhost:3000
 ```
-
-### Running tests
-```zsh
-# run and watch tests for the `chain` package
-pnpm run test --filter=chain -- --watchAll
-```
-
-Navigate to `localhost:3000` to see the example UI, or to `localhost:8080/graphql` to see the GQL interface of the locally running sequencer.
