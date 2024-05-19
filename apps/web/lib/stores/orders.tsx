@@ -1,17 +1,20 @@
 import { create } from "zustand";
+import { WritableDraft } from "immer";
 import { immer } from "zustand/middleware/immer";
 import { Client } from "./client";
-import { PublicKey, Field } from "o1js";
+import { PublicKey, Field, UInt64 } from "o1js";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
 import { CreateOrder, OrderId, Order } from "chain/dist/order";
+import { PaypalTxPublicData, PaypalTxProof } from "chain/dist/paypal"
+import { enableMapSet } from "immer";
+
+enableMapSet();
 
 export interface OrdersState {
     loading: boolean;
-    orders: {
-        [key: string]: string;
-    };
+    orders: Map<OrderId, Order>;
     getOrder: (client: Client, orderId: OrderId) => Promise<Order | undefined>;
-    // fetchOrders: (client: Client) => Promise<Order[]>;
+    getOrders: (client: Client) => Promise<void>;
     publishOrder: (
         client: Client,
         sender: PublicKey,
@@ -28,11 +31,12 @@ export interface OrdersState {
         user: PublicKey,
         orderId: OrderId
     ) => Promise<void>;
-    // verifyEmail: (
-    //     client: Client,
-    //     orderId: OrderId,
-    //     emailContent: string
-    // ) => Promise<void>;
+    proofOrder: (
+        client: Client,
+        proof: PaypalTxProof,
+        orderId: OrderId,
+        wallet: PublicKey
+    ) => Promise<void>;
 }
 
 function isPendingTransaction(
@@ -46,25 +50,43 @@ function isPendingTransaction(
 export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
     immer((set) => ({
         loading: Boolean(false),
-        orders: {},
+        orders: new Map<OrderId, Order>(),
         async getOrder(client: Client, orderId: OrderId) {
             const order = await client.query.runtime.OrderBook.orders.get(orderId);
             return order;
         },
-        // async fetchOrders(client: Client): Promise<Order[]> {
-        //     set((state) => {
-        //         state.loading = true;
-        //     });
+        async getOrders(client: Client) {
+            if (!client) {
+                return
+            }
+            try {
+                const indexLength = await client.query.runtime.OrderBook.orderIndexLength.get();
+                const orders = new Map<string, Order>();
+                if (indexLength && indexLength.greaterThan(new UInt64(1))) {
+                    for (let i = 0; i < indexLength.toBigInt(); i++) {
+                        try {
+                            const orderId = await client.query.runtime.OrderBook.orderIndex.get(UInt64.from(i));
+                            if (orderId) {
+                                const order = await client.query.runtime.OrderBook.orders.get(orderId);
+                                if (order) {
+                                    console.log(order.deleted.toBoolean())
+                                    orders.set(orderId.toString(), order);
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Failed to fetch order at index ${i.toString()}:`, error);
+                        }
+                    }
+                }
 
-        //     const orders = client.query.runtime.OrderBook.orders.get(new OrderId("test"));
-
-        //     set((state) => {
-        //         state.orders[orderId] = order;
-        //         state.loading = false;
-        //     });
-
-        //     return orders;
-        // },
+                set((state) => ({
+                    ...state,
+                    orders: orders,
+                }));
+            } catch (error) {
+                console.error('Failed to fetch orders:', error);
+            }
+        },
         async publishOrder(client: Client, sender: PublicKey, order: CreateOrder) {
             set((state) => {
                 state.loading = true;
@@ -84,10 +106,8 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
 
             // isPendingTransaction(tx.transaction);
 
-            const orderId = order.order_id.toString();
             set((state) => {
                 state.loading = false;
-                state.orders[orderId] = orderId;
             });
 
         },
@@ -128,23 +148,18 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
                 state.loading = false;
             });
         },
-        // async verifyEmail(client: Client, orderId: OrderId, emailContent: string) {
-        //     set((state) => {
-        //         state.loading = true;
-        //     });
+        async proofOrder(client: Client, proof: PaypalTxProof, orderId: OrderId, wallet: PublicKey) {
+            const paypalTxProof = new PaypalTxProof({
+                publicInput: proof.publicInput,
+            });
 
-        //     const orders = client.runtime.resolve("OrderBook"); await client.query.runtime.Balances.balances.get(key);
+            const tx = await client.transaction((wallet), async () => {
+                const orders = client.runtime.resolve('OrderBook');
+                orders.runOrder(paypalTxProof);
+            });
 
-        //     const tx = await client.transaction(PublicKey.fromBase58(orderId), async () => {
-        //         orders.verifyEmail(orderId, emailContent);
-        //     });
-
-        //     await tx.sign();
-        //     await tx.send();
-
-        //     set((state) => {
-        //         state.loading = false;
-        //     });
-        // },
+            await tx.sign();
+            await tx.send();
+        }
     }))
 );
