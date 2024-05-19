@@ -22,6 +22,18 @@ To be expanded.
 ![User Types](./ressources/user_types.png)
 *Figure 2: User Types*
 
+### The intended proof flow
+
+Or: How to verify the off-chain payments
+
+1. Make a payment using the gateway with an agreed upon sender_id, receiver_id, and amount
+2. Receive DKIM signed message from the payment domain
+3. Build the proof by selecting and locking the order and providing the .eml file
+
+The circuit for the proof is built with zk-email-o1js , o1js-rsa, zk-regex.
+The proof verifies against the public data of the order details that
+in essence is a hash of all the necessary information.
+
 ### What was accomplished
 - We were able to prepare custom Protokit branch that works with the new o1js version and succesfully build a full-stack app on top of it
 - The design of the system allowing for necessary interactions.
