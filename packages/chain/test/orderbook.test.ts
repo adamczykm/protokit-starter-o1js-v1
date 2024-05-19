@@ -1,11 +1,15 @@
 import { TestingAppChain } from "@proto-kit/sdk";
-import { Field, PrivateKey, PublicKey, UInt64 } from "o1js";
+import { Field, Poseidon, PrivateKey, PublicKey, Signature, UInt64 } from "o1js";
 import { log } from "@proto-kit/common";
 import { Balance, Balances, BalancesKey, TokenId } from "@proto-kit/library";
-import { OrderBook } from "../src/order-book"
+import { OrderBook } from "../src/order-book";
 import { OrderId } from "../src/order";
-import { DummyInvalidProof, compileZkProgram } from "../src/paypal";
-import { ProveExternalUsdTx, ExternalUsdTxProof, FakeProofPrivateData, UsdTxPublicData } from "proofs/dist/index.js"
+import { compileZkProgram } from "../src/paypal";
+import {
+  ProveExternalUsdTx,
+  FakeProofPrivateData,
+  UsdTxPublicData,
+} from "proofs/dist/index.js";
 
 log.setLevel("debug");
 
@@ -20,15 +24,14 @@ describe("order-book", () => {
 
   const appChain = TestingAppChain.fromRuntime({
     Balances,
-    OrderBook
+    OrderBook,
   });
 
   const orderbook = () => {
     return appChain.runtime.resolve("OrderBook");
-  }
+  };
 
   beforeAll(async () => {
-
     appChain.configurePartial({
       Runtime: {
         Balances: {
@@ -37,8 +40,8 @@ describe("order-book", () => {
         OrderBook: {
           minTokenAmount: UInt64.from(1),
           maxValidityPeriod: UInt64.from(5),
-          lockPeriod: UInt64.from(3)
-        }
+          lockPeriod: UInt64.from(3),
+        },
       },
     });
 
@@ -52,8 +55,6 @@ describe("order-book", () => {
   });
 
   it("should be able to create an order", async () => {
-
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(1);
@@ -65,7 +66,7 @@ describe("order-book", () => {
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
         amount_usd: UInt64.from(100),
-        usd_receiver_id_hash: Field(0)
+        usd_receiver_id_hash: Field(0),
       });
     });
 
@@ -77,9 +78,9 @@ describe("order-book", () => {
     const order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
     const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
-    expect(count?.toBigInt()).toEqual(1n)
+    expect(count?.toBigInt()).toEqual(1n);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
@@ -90,12 +91,9 @@ describe("order-book", () => {
 
     // should not be deleted
     expect(order?.deleted.toBoolean()).toBe(false);
-
-
   }, 1_000_000);
 
   it("should be able to create another order", async () => {
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(2);
@@ -107,7 +105,7 @@ describe("order-book", () => {
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
         amount_usd: UInt64.from(100),
-        usd_receiver_id_hash: Field(0)
+        usd_receiver_id_hash: Field(0),
       });
     });
 
@@ -118,7 +116,7 @@ describe("order-book", () => {
 
     const order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
@@ -131,19 +129,16 @@ describe("order-book", () => {
     expect(order?.deleted.toBoolean()).toBe(false);
 
     const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
-    expect(count?.toBigInt()).toEqual(2n)
-
+    expect(count?.toBigInt()).toEqual(2n);
   }, 1_000_000);
 
-
   it("should be able to cancel an unlocked order", async () => {
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(1);
 
     const tx1 = await appChain.transaction(alice, async () => {
-      orderbook().closeOrder(oid)
+      orderbook().closeOrder(oid);
     });
 
     await tx1.sign();
@@ -153,7 +148,7 @@ describe("order-book", () => {
 
     const order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
     expect(balance?.toBigInt()).toBe(100n);
 
@@ -161,11 +156,9 @@ describe("order-book", () => {
 
     // should be deleted
     expect(order?.deleted.toBoolean()).toBe(true);
-
   }, 1_000_000);
 
   it("should not be able to cancel an unlocked order if not the owner", async () => {
-
     appChain.setSigner(bobPrivateKey);
 
     const oid = new OrderId(2);
@@ -173,12 +166,11 @@ describe("order-book", () => {
     let order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
     const tx1 = await appChain.transaction(bob, async () => {
-      orderbook().closeOrder(oid)
+      orderbook().closeOrder(oid);
     });
 
     await tx1.sign();
     await tx1.send();
-
 
     const block = await appChain.produceBlock();
     expect(block?.height.equals(3));
@@ -190,17 +182,15 @@ describe("order-book", () => {
 
     // should not be deleted
     expect(order?.deleted.toBoolean()).toBe(false);
-
   }, 1_000_000);
 
   it("should be able to lock an unlocked order", async () => {
-
     appChain.setSigner(bobPrivateKey);
 
     const oid = new OrderId(2);
 
     const tx1 = await appChain.transaction(bob, async () => {
-      orderbook().lockOrder(oid, Field(3))
+      orderbook().lockOrder(oid, Field(3));
     });
 
     await tx1.sign();
@@ -222,17 +212,15 @@ describe("order-book", () => {
 
     // lock should not be zero
     expect(order?.lock.lock.toBigInt()).toBeGreaterThan(0n);
-
   }, 1_000_000);
 
   it("should not be able to lock a locked order", async () => {
-
     appChain.setSigner(bobPrivateKey);
 
     const oid = new OrderId(2);
 
     const tx1 = await appChain.transaction(bob, async () => {
-      orderbook().lockOrder(oid, Field(3))
+      orderbook().lockOrder(oid, Field(3));
     });
 
     await tx1.sign();
@@ -243,17 +231,15 @@ describe("order-book", () => {
 
     // invalid transaction
     expect(block?.transactions[0].status.toBoolean()).toBe(false);
-
   }, 1_000_000);
 
   it("should not be able to cancel a locked order", async () => {
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(2);
 
     const tx1 = await appChain.transaction(alice, async () => {
-      orderbook().closeOrder(oid)
+      orderbook().closeOrder(oid);
     });
 
     await tx1.sign();
@@ -265,23 +251,21 @@ describe("order-book", () => {
     let order = await appChain.query.runtime.OrderBook.orders.get(oid);
     expect(order?.locked_until.toBigInt()).toBe(7n);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
 
     expect(block?.transactions[0].status.toBoolean()).toBe(false);
 
     expect(balance?.toBigInt()).toBe(100n);
-
   }, 1_000_000);
 
   it("should be able to cancel a locked order if locked time passed", async () => {
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(2);
 
     const tx1 = await appChain.transaction(alice, async () => {
-      orderbook().closeOrder(oid)
+      orderbook().closeOrder(oid);
     });
 
     await tx1.sign();
@@ -294,41 +278,38 @@ describe("order-book", () => {
 
     expect(order?.deleted.toBoolean()).toBe(true);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
     expect(balance?.toBigInt()).toBe(0n);
 
     const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
-    expect(count?.toBigInt()).toEqual(2n)
-
+    expect(count?.toBigInt()).toEqual(2n);
   }, 1_000_000);
 
-
   it("Order indices work as expected", async () => {
-
     const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
-    expect(count?.toBigInt()).toEqual(2n)
+    expect(count?.toBigInt()).toEqual(2n);
 
-    const index0 = await appChain.query.runtime.OrderBook.orderIndex.get(UInt64.from(0));
-    expect(index0?.toBigInt()).toEqual(1n)
+    const index0 = await appChain.query.runtime.OrderBook.orderIndex.get(
+      UInt64.from(0),
+    );
+    expect(index0?.toBigInt()).toEqual(1n);
 
-    const index1 = await appChain.query.runtime.OrderBook.orderIndex.get(UInt64.from(1));
-    expect(index1?.toBigInt()).toEqual(2n)
+    const index1 = await appChain.query.runtime.OrderBook.orderIndex.get(
+      UInt64.from(1),
+    );
+    expect(index1?.toBigInt()).toEqual(2n);
+  });
 
-  })
-
-  it("TODO: should not be able to lock an invalid order", async () => {
-
-  })
+  it("TODO: should not be able to lock an invalid order", async () => {});
 
   it("should not be able to run an order without a valid (mock) proof and able with the valid proof", async () => {
-
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(10);
 
-    const amount_usd = UInt64.from(100)
-    const usd_receiver_id_hash = new Field(0)
+    const amount_usd = UInt64.from(100);
+    const usd_receiver_id_hash = new Field(0);
     const tx1 = await appChain.transaction(alice, async () => {
       orderbook().createOrder({
         order_id: oid,
@@ -336,7 +317,7 @@ describe("order-book", () => {
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
         amount_usd,
-        usd_receiver_id_hash
+        usd_receiver_id_hash,
       });
     });
 
@@ -350,9 +331,9 @@ describe("order-book", () => {
     const order = await appChain.query.runtime.OrderBook.orders.get(oid);
 
     const count = await appChain.query.runtime.OrderBook.orderIndexLength.get();
-    expect(count?.toBigInt()).toEqual(3n)
+    expect(count?.toBigInt()).toEqual(3n);
 
-    const bk = new BalancesKey({ tokenId, address: alice })
+    const bk = new BalancesKey({ tokenId, address: alice });
     const balance = await appChain.query.runtime.OrderBook.balances.get(bk);
 
     expect(block?.transactions[0].status.toBoolean()).toBe(true);
@@ -366,9 +347,9 @@ describe("order-book", () => {
 
     appChain.setSigner(bobPrivateKey);
 
-    const usd_sender_id_hash = new Field(2)
+    const usd_sender_id_hash = new Field(2);
     const tx2 = await appChain.transaction(bob, async () => {
-      orderbook().lockOrder(oid, usd_sender_id_hash)
+      orderbook().lockOrder(oid, usd_sender_id_hash);
     });
 
     await tx2.sign();
@@ -393,21 +374,69 @@ describe("order-book", () => {
 
     // ------------------------
     // PROVING
+
+    const buildRefData = ({
+      usd_amount,
+      usd_receiver_id_hash,
+      usd_sender_id_hash,
+      sender_public_key,
+    }: {
+      usd_amount: UInt64;
+      usd_receiver_id_hash: Field;
+      usd_sender_id_hash: Field;
+      sender_public_key: PublicKey;
+    }) => {
+      const lock = Poseidon.hash([
+        usd_sender_id_hash,
+        ...sender_public_key.toFields(),
+      ]);
+      const ret = Poseidon.hash([
+        usd_amount.value,
+        usd_receiver_id_hash,
+        lock,
+      ]);
+      return ret;
+    };
+    const ref = buildRefData({
+      usd_amount: amount_usd,
+      usd_receiver_id_hash,
+      usd_sender_id_hash,
+      sender_public_key: bob,
+    });
+
+    const signature = Signature.create(bobPrivateKey, [ref]);
+
     const invalidSecretInput = new FakeProofPrivateData({
       usd_amount: amount_usd,
       usd_receiver_id_hash,
-      usd_sender_id_hash: new Field(0),
-      sender_private_key: bob
-    }
-    )
+      usd_sender_id_hash: Field(0),
+      sender_public_key: bob,
+      sender_signature: signature,
+    });
 
-    const publicInput = new UsdTxPublicData({orderId: oid})
+    const validSecretInput = new FakeProofPrivateData({
+      usd_amount: amount_usd,
+      usd_receiver_id_hash,
+      usd_sender_id_hash,
+      sender_public_key: bob,
+      sender_signature: signature,
+    });
 
-    await compileZkProgram()
-    const proof = await ProveExternalUsdTx.fakeProof(publicInput, invalidSecretInput);
+    const publicInput = new UsdTxPublicData({ orderId: oid });
+
+    await compileZkProgram();
+    const invalidProof = await ProveExternalUsdTx.fakeProof(
+      publicInput,
+      invalidSecretInput,
+    );
+
+    const validProof = await ProveExternalUsdTx.fakeProof(
+      publicInput,
+      validSecretInput,
+    );
 
     const tx3 = await appChain.transaction(bob, async () => {
-      orderbook().runOrder(proof)
+      orderbook().runOrder(invalidProof);
     });
     await tx3.sign();
     await tx3.send();
@@ -415,10 +444,20 @@ describe("order-book", () => {
     const block3 = await appChain.produceBlock();
     expect(block3?.height.equals(10));
 
-    // valid transaction
+    // invalid transaction
     expect(block3?.transactions[0].status.toBoolean()).toBe(false);
 
+    const tx4 = await appChain.transaction(bob, async () => {
+      orderbook().runOrder(validProof);
+    });
+    await tx4.sign();
+    await tx4.send();
 
+    const block4 = await appChain.produceBlock();
+    expect(block4?.height.equals(11));
 
+    // valid transaction
+    expect(block4?.transactions[0].status.toBoolean()).toBe(true);
   }, 1_000_000);
+
 });
