@@ -66,7 +66,7 @@ The monorepo contains 2 packages and 1 app:
 ```zsh
 # ensures you have the right node.js version
 nvm use
-pnpm run setup_protokit # we needes to prepare custom framework version
+pnpm run setup_protokit # we need to prepare custom framework version
 pnpm install
 pnpm run build # this may hang during the web app compilation you may stop it
 ```
