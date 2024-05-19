@@ -6,6 +6,7 @@ import { PublicKey, Field, UInt64 } from "o1js";
 import { PendingTransaction, UnsignedTransaction } from "@proto-kit/sequencer";
 import { CreateOrder, OrderId, Order } from "chain/dist/order";
 import { PaypalTxPublicData, PaypalTxProof } from "chain/dist/paypal"
+import { ExternalUsdTxProof } from "proofs/dist/index";
 import { enableMapSet } from "immer";
 
 enableMapSet();
@@ -33,7 +34,7 @@ export interface OrdersState {
     ) => Promise<void>;
     proofOrder: (
         client: Client,
-        proof: PaypalTxProof,
+        proof: ExternalUsdTxProof,
         orderId: OrderId,
         wallet: PublicKey
     ) => Promise<void>;
@@ -148,14 +149,11 @@ export const useOrdersStore = create<OrdersState, [["zustand/immer", never]]>(
                 state.loading = false;
             });
         },
-        async proofOrder(client: Client, proof: PaypalTxProof, orderId: OrderId, wallet: PublicKey) {
-            const paypalTxProof = new PaypalTxProof({
-                publicInput: proof.publicInput,
-            });
+        async proofOrder(client: Client, proof: ExternalUsdTxProof, orderId: OrderId, wallet: PublicKey) {
 
             const tx = await client.transaction((wallet), async () => {
                 const orders = client.runtime.resolve('OrderBook');
-                orders.runOrder(paypalTxProof);
+                orders.runOrder(proof);
             });
 
             await tx.sign();

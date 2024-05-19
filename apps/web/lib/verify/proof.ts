@@ -3,6 +3,12 @@ import { OrderId } from "chain/dist/order";
 import { OrderLock } from "chain/dist/order-lock";
 import { UsdTxProofData } from "chain/dist/usd-tx";
 import { PaypalTxPublicData } from "chain/dist/paypal";
+import { ProveExternalUsdTx } from "proofs/dist/index.js";
+
+export async function compileZkProgram() {
+  const { verificationKey } = await ProveExternalUsdTx.compile();
+  console.log("ZK Program compiled with verification key:", verificationKey);
+}
 
 export const computeProofDataHash = (
   usdAmount: UInt64,
@@ -23,15 +29,4 @@ export const computeProofDataHash = (
   });
 
   return proofData.hash();
-};
-
-export const generatePublicInput = (
-  orderId: OrderId,
-  proofDataHash: Field,
-): PaypalTxPublicData => {
-  return new PaypalTxPublicData({
-    orderId: orderId,
-    usdTxProofDataHash: proofDataHash,
-    shouldVerify: new Bool(true),
-  });
 };

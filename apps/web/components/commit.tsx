@@ -6,8 +6,10 @@ import { useOrdersStore } from "@/lib/stores/orders";
 import { useEffect, useState } from "react";
 import { PublicKey, CircuitString, Field, UInt64, Bool } from "o1js";
 import { Order, OrderId } from "chain/dist/order"
-import { PaypalTxProof } from "chain/dist/paypal"
-import { computeProofDataHash, generatePublicInput } from "@/lib/verify/proof"
+// import { PaypalTxProof, PaypalTxPublicData } from "chain/dist/paypal"
+import { compileZkProgram } from "@/lib/verify/proof"
+import { parseEmail } from "@/lib/verify/inputs";
+import { ProveExternalUsdTx, UsdTxPublicData, FakeProofPrivateData, ExternalUsdTxProof } from 'proofs/dist/index';
 
 export interface CommitOrderProps {
     wallet?: string;
@@ -38,6 +40,7 @@ export function CommitOrderInternal({
     }));
     const [paypalId, setPaypalId] = useState<string>("");
     const [emailContent, setEmailContent] = useState('');
+    const [proofMessage, setProofMessage] = useState("");
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -73,20 +76,56 @@ export function CommitOrderInternal({
         }
     };
 
-    const handleSubmitProof = async (orderId: OrderId, order: Order) => {
+    const handleSubmitProof = async (orderId: OrderId) => {
         if (!client || !wallet) {
             return
         }
         try {
-            const proofDataHash = computeProofDataHash(
-                order.amount_usd,
-                order.usd_receiver_id_hash,
-                paypalId,
-                new PublicKey(wallet)
-            );
+            // const {
+            //     paypalAccountId,
+            //     usdAmount,
+            //     transactionId
+            // } = await parseEmail(emailContent);
 
-            const publicInput = generatePublicInput(orderId, proofDataHash);
-            const proof = new PaypalTxProof({ publicInput });
+            const receiverHash = Field.from(CircuitString.fromString("paypalAccountId").hash());
+            // const proofDataHash = computeProofDataHash(
+            //     UInt64.from(usdAmount),
+            //     receiverHash,
+            //     paypalId,
+            //     new PublicKey(wallet)
+            // );
+
+            // const publicInput = new PaypalTxPublicData({
+            //     orderId: orderId,
+            //     usdTxProofDataHash: proofDataHash,
+            //     shouldVerify: new Bool(true),
+            // });
+            const publicInput = new UsdTxPublicData({
+                orderId: orderId,
+            });
+            // const proof = new PaypalTxProof({ publicInput });
+
+            // Generate the private input for the fake proof
+            const privateInput = new FakeProofPrivateData({
+                usd_amount: UInt64.from(10),
+                usd_receiver_id_hash: receiverHash,
+                usd_sender_id_hash: CircuitString.fromString(paypalId).hash(),
+                sender_private_key: PublicKey.fromBase58(wallet),
+            });
+
+            // Compile the ZK program (only needs to be done once)
+            await compileZkProgram();
+
+            // Generate the proof using the ZK program
+            const proof = await ProveExternalUsdTx.fakeProof(publicInput, privateInput);
+
+            // const paypalTxProof = new PaypalTxProof({
+            //     publicInput: new PaypalTxPublicData({
+            //         orderId: order.order_id,
+            //         usdTxProofDataHash: proof.publicOutput.usdTxProofDataHash,
+            //         shouldVerify: 
+            //     }),
+            // });
 
             await proofOrder(client, proof, orderId, PublicKey.fromBase58(wallet));
             alert('Proof submitted successfully!');
@@ -155,6 +194,15 @@ export function CommitOrderInternal({
                                 onChange={(e) => handleUpload(e)}
                                 className="mt-2 ml-10"
                             />
+                            <Button
+                                className="text-green-500 hover:text-green-700 ml-4"
+                                onClick={() => handleSubmitProof(new OrderId(UInt64.from(orderId)))}
+                                loading={loading}
+                                disabled={emailContent ? false : true}
+                            >
+                                Proof
+                            </Button>
+                            {proofMessage}
                         </div>
                     </div>
                     );
