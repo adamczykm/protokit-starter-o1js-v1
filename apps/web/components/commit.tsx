@@ -8,7 +8,6 @@ import { PublicKey, CircuitString, Field, UInt64, Bool } from "o1js";
 import { Order, OrderId } from "chain/dist/order"
 import { PaypalTxProof } from "chain/dist/paypal"
 import { computeProofDataHash, generatePublicInput } from "@/lib/verify/proof"
-import { generateInputs } from "@/lib/verify/email";
 
 export interface CommitOrderProps {
     wallet?: string;
@@ -79,8 +78,6 @@ export function CommitOrderInternal({
             return
         }
         try {
-            const inputs = await generateInputs(emailContent);
-
             const proofDataHash = computeProofDataHash(
                 order.amount_usd,
                 order.usd_receiver_id_hash,

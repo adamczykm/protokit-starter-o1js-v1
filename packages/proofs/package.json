@@ -40,8 +40,7 @@
     "typescript": "^5.2.2"
   },
   "peerDependencies": {
-    "o1js": "link:./deps/protokit/node_modules/o1js",
-    "zk-email-o1js": "file:./deps/zkemail"
+    "o1js": "link:./deps/protokit/node_modules/o1js"
   },
   "license": "Apache-2.0"
 }

@@ -1,9 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "setup_deps": "npm run setup_protokit && npm run setup_zk-email-o1js",
+    "setup_deps": "npm run setup_protokit",
     "setup_protokit": "sh ./scripts/install_dep.sh https://github.com/adamczykm/protokit-framework o1js-1 protokit",
-    "setup_zk-email-o1js": "sh ./scripts/install_dep.sh https://github.com/mohammed7s/zk-email-o1js main zkemail",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
