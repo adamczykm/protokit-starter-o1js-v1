@@ -61,7 +61,6 @@ export function Order({
                 );
             }
         } finally {
-            methods.reset();
             setLoading(false);
         }
     };

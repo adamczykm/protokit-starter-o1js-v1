@@ -5,7 +5,7 @@ import { useClientStore } from "@/lib/stores/client";
 import { useOrdersStore } from "@/lib/stores/orders";
 import { useEffect, useState } from "react";
 import { PublicKey, CircuitString, Field, UInt64, Bool } from "o1js";
-import { Order, OrderId } from "chain/dist/order"
+import { Order, OrderId } from "chain/dist/order";
 // import { PaypalTxProof, PaypalTxPublicData } from "chain/dist/paypal"
 import { compileZkProgram } from "@/lib/verify/proof"
 import { parseEmail } from "@/lib/verify/inputs";
@@ -161,7 +161,7 @@ export function CommitOrderInternal({
                         <h3 className="font-semibold text-lg mb-2">Order #{orderId.toString()}</h3>
                         <div className="grid grid-cols-2 gap-4 mb-2">
                             <div>Amount: {order.amount_token.toString()} MINA</div>
-                            <div>Price: {order.amount_usd.toString()} $</div>
+                            <div>Price: {order.amount_usd.div(100).toString()} $</div>
                             <div>Valid Until: {order.valid_until.toString()}</div>
                             <div>Locked: {order.locked_until?.toString() || "N/A"}</div>
                             <div>Deleted: {(Bool.fromValue(order.deleted)).toBoolean() ? "Y" : "N"}</div>
@@ -178,6 +178,7 @@ export function CommitOrderInternal({
                                 size="sm"
                                 onClick={() => handleCommit(new OrderId(UInt64.from(orderId)), "exampleSenderId")}
                                 loading={loading}
+                                disabled={(paypalId === "") ? true : false}
                             >
                                 Commit to Order
                             </Button>
@@ -185,6 +186,7 @@ export function CommitOrderInternal({
                                 className="text-red-500 hover:text-red-700 ml-4"
                                 onClick={() => handleRemove(new OrderId(UInt64.from(orderId)))}
                                 loading={loading}
+                                disabled={(Bool.fromValue(order.deleted)).toBoolean() ? true : false}
                             >
                                 Close
                             </Button>
