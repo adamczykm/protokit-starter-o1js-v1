@@ -3,9 +3,9 @@ import { State, StateMap, assert, } from "@proto-kit/protocol";
 import { CreateOrder, DeletedOrder, Order, OrderId } from "./order";
 import { Bool, Field, PublicKey, UInt64 } from "o1js";
 import { OrderLock } from "./order-lock";
-import { PaypalTxProof } from "./paypal";
 import { UsdTxProofData } from "./usd-tx";
 import { Balance, Balances as BaseBalances, TokenId } from "@proto-kit/library";
+import { ExternalUsdTxProof } from "proofs/dist/index.js"
 
 interface OrderBookConfig {
   minTokenAmount: UInt64,
@@ -144,19 +144,19 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
   // run the order, requires proof of the paypal transaction that matches all the details
   @runtimeMethod()
   public async runOrder(
-    paypal_tx_proof: PaypalTxProof
+    paypal_tx_proof: ExternalUsdTxProof
   ): Promise<void> {
     // --------
     // proof initial checks
 
     // it must be valid
-    paypal_tx_proof.mockVerify();
+    paypal_tx_proof.verify()
     const order_id = paypal_tx_proof.publicInput.orderId;
 
     // --------
     // order checks
     // must exist
-    const order: Order = this.orders.get(order_id).value; // TODO: check if it exists
+    const order: Order = this.orders.get(new OrderId(order_id)).value; // TODO: check if it exists
     // must not be deleted
     assert(order.deleted.equals(Bool(false)), "Order does not exist");
 
@@ -166,7 +166,7 @@ export class OrderBook extends BaseBalances<OrderBookConfig> {
     // --------
     /// do the proof data check
     const proof_data_hash_from_order = UsdTxProofData.fromLockedOrder(order).hash();
-    const proof_data_hash_from_proof = paypal_tx_proof.publicInput.usdTxProofDataHash;
+    const proof_data_hash_from_proof = paypal_tx_proof.publicOutput.usdTxProofDataHash;
 
     assert(proof_data_hash_from_order.equals(proof_data_hash_from_proof), "Proof data does not match the order");
 

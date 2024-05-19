@@ -1,6 +1,11 @@
 import { assert } from "@proto-kit/protocol";
-import { Bool, CircuitString, Field, Struct } from "o1js";
+import { Bool, CircuitString, Field, Struct, VerificationKey } from "o1js";
 import { OrderId } from "./order";
+import { ProveExternalUsdTx  } from "proofs/dist/index.js"
+
+export async function compileZkProgram() : Promise<{verificationKey: VerificationKey}> {
+  return await ProveExternalUsdTx.compile();
+}
 
 export class PaypalIdHash extends Struct({
   value: Field,

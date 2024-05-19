@@ -4,6 +4,8 @@ import { log } from "@proto-kit/common";
 import { Balance, Balances, BalancesKey, TokenId } from "@proto-kit/library";
 import { OrderBook } from "../src/order-book"
 import { OrderId } from "../src/order";
+import { DummyInvalidProof, compileZkProgram } from "../src/paypal";
+import { ProveExternalUsdTx, ExternalUsdTxProof, FakeProofPrivateData, UsdTxPublicData } from "proofs/dist/index.js"
 
 log.setLevel("debug");
 
@@ -314,24 +316,27 @@ describe("order-book", () => {
     expect(index1?.toBigInt()).toEqual(2n)
 
   })
-  it("should not be able to lock an invalid order", async () => {
+
+  it("TODO: should not be able to lock an invalid order", async () => {
 
   })
 
-  it("should not be able to run an order without a valid (mock) proof", async () => {
+  it("should not be able to run an order without a valid (mock) proof and able with the valid proof", async () => {
 
     appChain.setSigner(alicePrivateKey);
 
     const oid = new OrderId(10);
 
+    const amount_usd = UInt64.from(100)
+    const usd_receiver_id_hash = new Field(0)
     const tx1 = await appChain.transaction(alice, async () => {
       orderbook().createOrder({
         order_id: oid,
         valid_until: UInt64.from(10),
         token_id: TokenId.from(0), // mina
         amount_token: Balance.from(100),
-        amount_usd: UInt64.from(100),
-        usd_receiver_id_hash: Field(0)
+        amount_usd,
+        usd_receiver_id_hash
       });
     });
 
@@ -361,8 +366,9 @@ describe("order-book", () => {
 
     appChain.setSigner(bobPrivateKey);
 
+    const usd_sender_id_hash = new Field(2)
     const tx2 = await appChain.transaction(bob, async () => {
-      orderbook().lockOrder(oid, Field(2))
+      orderbook().lockOrder(oid, usd_sender_id_hash)
     });
 
     await tx2.sign();
@@ -384,6 +390,35 @@ describe("order-book", () => {
 
     // lock should not be zero
     expect(order2?.lock.lock.toBigInt()).toBeGreaterThan(0n);
+
+    // ------------------------
+    // PROVING
+    const invalidSecretInput = new FakeProofPrivateData({
+      usd_amount: amount_usd,
+      usd_receiver_id_hash,
+      usd_sender_id_hash: new Field(0),
+      sender_private_key: bobPrivateKey
+    }
+    )
+
+    const publicInput = new UsdTxPublicData({orderId: oid})
+
+    await compileZkProgram()
+    const proof = await ProveExternalUsdTx.fakeProof(publicInput, invalidSecretInput);
+
+    const tx3 = await appChain.transaction(bob, async () => {
+      orderbook().runOrder(proof)
+    });
+    await tx3.sign();
+    await tx3.send();
+
+    const block3 = await appChain.produceBlock();
+    expect(block3?.height.equals(10));
+
+    // valid transaction
+    expect(block3?.transactions[0].status.toBoolean()).toBe(false);
+
+
 
   }, 1_000_000);
 });

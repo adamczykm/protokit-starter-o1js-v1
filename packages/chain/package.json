@@ -59,6 +59,7 @@
     "util": "^0.12.5"
   },
   "dependencies": {
+    "proofs": "workspace:*",
     "reflect-metadata": "^0.2.1"
   }
 }
