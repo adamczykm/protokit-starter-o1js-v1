@@ -16,6 +16,12 @@ The project submission is divided into two branches:
 The goal idea is to provide a decentralized (or decentralizable) platform to create p2p orders that would trustlessly allow to exchange between FIAT and MINA without revealing token buyer off-chain identity.
 To be expanded.
 
+![User Data](./ressources/user_data.png)
+*Figure 1: Representation of User Roles*
+
+![User Types](./ressources/user_types.png)
+*Figure 2: User Types*
+
 ### What was accomplished
 - We were able to prepare custom Protokit branch that works with the new o1js version and succesfully build a full-stack app on top of it
 - The design of the system allowing for necessary interactions.
