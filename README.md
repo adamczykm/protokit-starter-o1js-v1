@@ -29,10 +29,18 @@ To be expanded.
 
 - **The essential part of verifying the e-mail receipt** - the tools we meant to used are in alpha level functionality and we ran out of time before preparing that part. 
 - The proto-kit sequencer is now the only entity holding the off-chain state of the system which mean that is not yet trustless.
+- **The system does not yet use L1 bridge** - instead of bridging with L1 the tokens are minted and burned.
 - UI is not finished
 	- it doesn't provide enough information, smooth UX and necessary feedback.
 	- it doesn't work with the newest circuits we prepared
 - The code quality suffered heavily because of the pace of the prototyping
+
+
+### Summary
+
+We think we have a valid proof-of-concept with essential, but well-defined gaps, that can easily (but with bigger time-budget) be filled with attainable pieces.
+We showed that MINA, o1js and proto-kit provide an innovative platform for rapid prototyping of full-stack ZK-based apps and that the ecosystem is still in its
+early stage.
 
 
 ### The potential road ahead
