@@ -1,4 +1,4 @@
-import { Struct, Field, ZkProgram, CircuitString, UInt64, Poseidon, PrivateKey } from 'o1js';
+import { Struct, Field, ZkProgram, CircuitString, UInt64, Poseidon, PrivateKey, PublicKey } from 'o1js';
 
 export class UsdTxPublicData extends Struct({
   orderId: UInt64,
@@ -17,12 +17,12 @@ export class FakeProofPrivateData extends Struct({
   usd_amount: UInt64,
   usd_receiver_id_hash: Field,
   usd_sender_id_hash: Field,
-  sender_private_key: PrivateKey
+  sender_private_key: PublicKey // TODO: temporary -> use signatures
 }) {}
 
 
 export function buildPublicReferenceData(p: FakeProofPrivateData) {
-  const sender_public_key = p.sender_private_key.toPublicKey()
+  const sender_public_key = p.sender_private_key
   const lock = Poseidon.hash([p.usd_sender_id_hash, ...sender_public_key.toFields()]);
   const ret =  Poseidon.hash([
     p.usd_amount.value,

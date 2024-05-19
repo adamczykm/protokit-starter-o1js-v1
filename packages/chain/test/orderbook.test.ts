@@ -397,7 +397,7 @@ describe("order-book", () => {
       usd_amount: amount_usd,
       usd_receiver_id_hash,
       usd_sender_id_hash: new Field(0),
-      sender_private_key: bobPrivateKey
+      sender_private_key: bob
     }
     )
 
