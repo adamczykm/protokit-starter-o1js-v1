@@ -1,5 +1,13 @@
 import { useState } from 'react';
 
+/* import {verifyEmail} from 'zk-email-o1js/src/email-verify'; */
+import { generateInputs } from 'zk-email-o1js/build/src/generate-inputs.js';
+
+
+const asd = generateInputs('email');
+
+
+
 const EmailUploader: React.FC = () => {
     const [customerId, setCustomerId] = useState<string | null>(null);
     const [inputText, setInputText] = useState<string>('');

@@ -29,7 +29,7 @@ const Page: React.FC = () => {
         const result = await client.request<{ someQuery: SomeQueryData[] }>(QUERY);
         setData(result.someQuery);
       } catch (err) {
-        setError(err.message);
+        setError((err as Error).message);
       } finally {
         setLoading(false);
       }

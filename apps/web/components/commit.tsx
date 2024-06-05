@@ -68,8 +68,10 @@ export function CommitOrderInternal({
         setLoading(true);
         try {
             if (file && client) {
+                console.log('test');
                 const emailContent = await file.text();
                 setEmailContent(emailContent);
+                console.log(emailContent.length);
             }
         } finally {
             setLoading(false);
